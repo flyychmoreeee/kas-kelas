@@ -1,26 +1,209 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+
+  /* ── Semantic color tokens (components reference ONLY these) ── */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Status: distinct from primary — used for success/paid states */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  /* Danger: used for expense/unpaid (destructive alias) */
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  /* Warning: used for pending/belum bayar */
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  /* Surfaces: shadow-based depth, not borders */
+  --shadow-card: var(--shadow-card-value);
+  --shadow-card-hover: var(--shadow-card-hover-value);
+
+  /* Chart */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar (unused but shadcn requires) */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  /* Radii */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * ──────────────────────────────────────────
+ * COLOR SYSTEM
+ * ──────────────────────────────────────────
+ *
+ * Structure (per better-colors):
+ *   Primitives → defined here by hue, constant across themes
+ *   Semantics  → CSS vars consumed by @theme above
+ *
+ * Palette:
+ *   Neutral   — cool-green tinted gray (hue 160, chroma 0.005–0.015)
+ *   Accent    — emerald (hue 162, chroma 0.17)  [brand / interactive]
+ *   Success   — green-teal (hue 155)            [paid / lunas]
+ *   Danger    — warm red (hue 25)               [expense / unpaid]
+ *   Warning   — amber (hue 85)                  [pending / belum bayar]
+ *
+ * The accent hue (162) and success hue (155) differ by only 7°,
+ * but they serve separate roles: accent = interactive, success = status.
+ * They never need to be distinguished side by side.
+ * Danger (25) is 137° away — no collision.
+ */
+
+:root {
+  /* ── Deep Obsidian / Monochrome Dark Palette (matches reference image) ── */
+  --background:           oklch(0.11 0.002 260); /* #0c0c0e deep black */
+  --foreground:           oklch(0.98 0 0);       /* #fafafa crisp white text */
+  --card:                 oklch(0.16 0.003 260); /* #161619 card panel */
+  --card-foreground:      oklch(0.98 0 0);
+  --popover:              oklch(0.16 0.003 260);
+  --popover-foreground:   oklch(0.98 0 0);
+  --muted:                oklch(0.13 0.003 260); /* recessed well container */
+  --muted-foreground:     oklch(0.65 0.005 260); /* #9ca3af secondary label text */
+  --secondary:            oklch(0.22 0.004 260); /* #27272a charcoal pill */
+  --secondary-foreground: oklch(0.96 0 0);
+  --accent:               oklch(0.22 0.004 260);
+  --accent-foreground:    oklch(0.98 0 0);
+  --border:               oklch(0.22 0.003 260); /* subtle border */
+  --input:                oklch(0.13 0.003 260); /* inner recessed input */
+  --ring:                 oklch(0.98 0 0);
+
+  /* ── Primary CTA: Solid High-Contrast White with Black Text ── */
+  --primary:              oklch(0.98 0 0);       /* #ffffff */
+  --primary-foreground:   oklch(0.11 0 0);       /* #09090b */
+
+  /* ── Status Semantics ── */
+  --success:              oklch(0.76 0.16 155);  /* clean mint/emerald */
+  --success-foreground:   oklch(0.12 0.02 155);
+
+  --destructive:          oklch(0.68 0.21 25);   /* clean coral */
+  --danger:               oklch(0.68 0.21 25);
+  --danger-foreground:    oklch(0.98 0 0);
+
+  --warning:              oklch(0.80 0.15 85);   /* warm amber */
+  --warning-foreground:   oklch(0.18 0.04 85);
+
+  /* ── Shadows for crisp edge elevation ── */
+  --shadow-card-value:       0 0 0 1px oklch(1 0 0 / 0.08), 0 2px 8px -2px oklch(0 0 0 / 0.5);
+  --shadow-card-hover-value: 0 0 0 1px oklch(1 0 0 / 0.14), 0 4px 16px -4px oklch(0 0 0 / 0.6);
+
+  /* ── Chart ── */
+  --chart-1: oklch(0.98 0 0);
+  --chart-2: oklch(0.70 0.005 260);
+  --chart-3: oklch(0.50 0.005 260);
+  --chart-4: oklch(0.35 0.005 260);
+  --chart-5: oklch(0.25 0.005 260);
+
+  /* ── Radius ── */
+  --radius: 0.875rem;
+
+  /* ── Sidebar ── */
+  --sidebar:                  oklch(0.13 0.003 260);
+  --sidebar-foreground:       oklch(0.98 0 0);
+  --sidebar-primary:          oklch(0.98 0 0);
+  --sidebar-primary-foreground: oklch(0.11 0 0);
+  --sidebar-accent:           oklch(0.20 0.004 260);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border:           oklch(0.22 0.003 260);
+  --sidebar-ring:             oklch(0.98 0 0);
+}
+
+/* ── Base layer ── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans antialiased;
+  }
+
+  /* Tabular numbers on changing monetary values (better-typography) */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Utilities ── */
+@layer utilities {
+  /* Glass surface for bottom nav */
+  .glass {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background-color: oklch(0.11 0.002 260 / 0.88);
+  }
+
+  /* Scale on press — exactly 0.96 per better-ui */
+  .press-scale {
+    transition-property: scale;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .press-scale:active {
+    scale: 0.96;
+  }
+
+  /* Shadow-based card depth (better-ui: shadows for elevation, borders for structure) */
+  .surface-card {
+    box-shadow: var(--shadow-card-value);
+    transition-property: box-shadow;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+  .surface-card:hover {
+    box-shadow: var(--shadow-card-hover-value);
+  }
+
+  /* Select dropdown styling — distinct from content (better-layout) */
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.5rem;
+  }
 }
