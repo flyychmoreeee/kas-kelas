@@ -8,9 +8,7 @@ import {
   Users,
   Trash2,
   Pencil,
-  Zap,
   ArrowRight,
-  Sparkles,
   CalendarRange,
   Calendar,
 } from "lucide-react";
@@ -196,6 +194,28 @@ export default function WeeksPage() {
           setFilterYear(y);
         }}
       />
+
+      {/* Quick Access: Bulk Monthly View */}
+      {!loading && weeks.length > 0 && filterType !== "incidental" && (
+        <Link href="/kas/bulan" className="block">
+          <div className="rounded-xl bg-black/40 border border-white/10 p-3.5 flex items-center justify-between hover:bg-white/5 transition-colors press-scale group">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center">
+                <CalendarRange className="h-4 w-4 text-white/70" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-white">
+                  Pencatatan Bulanan
+                </p>
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  Catat semua minggu sekaligus dalam 1 halaman
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-white transition-colors" />
+          </div>
+        </Link>
+      )}
 
       {/* Week & Dues List */}
       {loading ? (
