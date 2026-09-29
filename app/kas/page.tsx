@@ -242,7 +242,6 @@ export default function WeeksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       {isIncidental ? (
                         <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold tracking-wider flex items-center gap-1">
-                          <Sparkles className="h-2.5 w-2.5" />
                           IURAN KHUSUS
                         </span>
                       ) : (

@@ -5,11 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Search,
-  CheckCircle2,
   Users,
   Loader2,
   X,
-  Sparkles,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +28,7 @@ export default function ChecklistPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [onlyUnpaid, setOnlyUnpaid] = useState(false);
-  const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
+  const [togglingKeys, setTogglingKeys] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(
     async (searchQuery?: string) => {
@@ -72,18 +70,24 @@ export default function ChecklistPage() {
     };
   }, [weekId, search]);
 
-  const handleToggle = async (student: WeekStudent) => {
+  const handlePayment = async (student: WeekStudent, method: "cash" | "qris") => {
     const id = student.id;
+    const key = `${id}-${method}`;
+    setTogglingKeys((prev) => new Set(prev).add(key));
 
-    // Optimistic update
-    setTogglingIds((prev) => new Set(prev).add(id));
+    const prevStudent = { ...student };
+    const nowIso = new Date().toISOString();
+
+    // Optimistic update students
     setStudents((prev) =>
       prev.map((s) =>
         s.id === id
           ? {
               ...s,
-              is_paid: !s.is_paid,
-              status: s.is_paid ? ("unpaid" as const) : ("paid" as const),
+              is_paid: true,
+              status: "paid" as const,
+              payment_method: method,
+              paid_at: nowIso,
             }
           : s
       )
@@ -92,9 +96,8 @@ export default function ChecklistPage() {
     // Update stats optimistically
     setStats((prev) => {
       if (!prev) return prev;
-      const delta = student.is_paid ? -1 : 1;
-      const newPaid = prev.paid_count + delta;
-      const newUnpaid = prev.unpaid_count - delta;
+      const newPaid = prev.paid_count + 1;
+      const newUnpaid = prev.unpaid_count - 1;
       const newCollected = newPaid * (week?.amount ?? 0);
       return {
         ...prev,
@@ -112,33 +115,121 @@ export default function ChecklistPage() {
       const res = await togglePayment({
         student_id: id,
         kas_week_id: weekId,
+        payment_method: method,
+        status: "paid",
       });
 
-      const name = student.nickname || student.name.split(" ")[0];
-      if (res.data.is_paid) {
-        toast.success(`${name} lunas`);
-      } else {
-        toast(`${name} dibatalkan`);
+      if (res.data) {
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  is_paid: res.data.is_paid,
+                  status: res.data.status,
+                  payment_method: res.data.payment_method,
+                  paid_at: res.data.paid_at || nowIso,
+                }
+              : s
+          )
+        );
       }
+
+      const name = student.nickname || student.name.split(" ")[0];
+      toast.success(
+        `${name} lunas (${method === "cash" ? "Cash" : "QRIS"})`
+      );
     } catch {
       // Revert on error
       setStudents((prev) =>
-        prev.map((s) =>
-          s.id === id
-            ? {
-                ...s,
-                is_paid: student.is_paid,
-                status: student.status,
-              }
-            : s
-        )
+        prev.map((s) => (s.id === id ? prevStudent : s))
       );
       toast.error("Gagal mengubah status pembayaran");
       fetchData(search || undefined);
     } finally {
-      setTogglingIds((prev) => {
+      setTogglingKeys((prev) => {
         const next = new Set(prev);
-        next.delete(id);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const handleCancel = async (student: WeekStudent) => {
+    const id = student.id;
+    const key = `${id}-cancel`;
+    setTogglingKeys((prev) => new Set(prev).add(key));
+
+    const prevStudent = { ...student };
+
+    // Optimistic update students
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              is_paid: false,
+              status: "unpaid" as const,
+              paid_at: null,
+            }
+          : s
+      )
+    );
+
+    // Update stats optimistically
+    setStats((prev) => {
+      if (!prev) return prev;
+      const newPaid = prev.paid_count - 1;
+      const newUnpaid = prev.unpaid_count + 1;
+      const newCollected = newPaid * (week?.amount ?? 0);
+      return {
+        ...prev,
+        paid_count: newPaid,
+        unpaid_count: newUnpaid,
+        total_collected: newCollected,
+        collection_percentage:
+          prev.target_amount > 0
+            ? Math.round((newCollected / prev.target_amount) * 100 * 10) / 10
+            : 0,
+      };
+    });
+
+    try {
+      const res = await togglePayment({
+        student_id: id,
+        kas_week_id: weekId,
+        status: "unpaid",
+      });
+
+      if (res.data) {
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  is_paid: res.data.is_paid,
+                  status: res.data.status,
+                  payment_method: res.data.payment_method,
+                  paid_at: res.data.paid_at,
+                }
+              : s
+          )
+        );
+      }
+
+      const name = student.nickname || student.name.split(" ")[0];
+      toast(`${name} dibatalkan`);
+    } catch {
+      // Revert on error
+      setStudents((prev) =>
+        prev.map((s) => (s.id === id ? prevStudent : s))
+      );
+      toast.error("Gagal membatalkan pembayaran");
+      fetchData(search || undefined);
+    } finally {
+      setTogglingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
         return next;
       });
     }
@@ -175,7 +266,6 @@ export default function ChecklistPage() {
                   </h1>
                   {week?.type === "incidental" && (
                     <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-bold tracking-wider flex items-center gap-0.5">
-                      <Sparkles className="h-2.5 w-2.5" />
                       Khusus
                     </span>
                   )}
@@ -295,16 +385,20 @@ export default function ChecklistPage() {
           </div>
         ) : (
           filteredStudents.map((student) => {
-            const isToggling = togglingIds.has(student.id);
+            const isCashLoading = togglingKeys.has(`${student.id}-cash`);
+            const isQrisLoading = togglingKeys.has(`${student.id}-qris`);
+            const isCancelLoading = togglingKeys.has(`${student.id}-cancel`);
+            const isAnyLoading = isCashLoading || isQrisLoading || isCancelLoading;
+
             return (
               <div
                 key={student.id}
                 className={cn(
                   "surface-card rounded-2xl bg-card border p-3 flex items-center justify-between gap-3 transition-all",
                   student.is_paid
-                    ? "border-success/25 bg-success/2"
+                    ? "border-emerald-500/25 bg-emerald-500/2"
                     : "border-border/40 hover:border-border/80",
-                  isToggling && "opacity-60"
+                  isAnyLoading && "opacity-75"
                 )}
               >
                 {/* Left: Attendance badge + Name */}
@@ -316,38 +410,77 @@ export default function ChecklistPage() {
                     <p className="text-sm font-semibold text-white truncate leading-snug">
                       {student.name}
                     </p>
-                    {student.nickname && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {student.nickname}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
+                      {student.nickname && <span>{student.nickname}</span>}
+                      {student.is_paid && (
+                        <>
+                          {student.nickname && <span>•</span>}
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                            {student.payment_method === "qris" ? "QRIS" : "Cash"}
+                          </span>
+                          {student.paid_at && (
+                            <span className="text-[11px] text-white/70 tabular-nums">
+                              • {formatDate(student.paid_at)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Right: Quick One-Tap Toggle Button */}
-                <button
-                  onClick={() => handleToggle(student)}
-                  disabled={isToggling}
-                  className={cn(
-                    "h-8 px-3 rounded-xl text-xs font-semibold press-scale transition-all shrink-0 flex items-center gap-1.5 border shadow-sm",
-                    student.is_paid
-                      ? "bg-success/15 text-success border-success/30 hover:bg-success/25"
-                      : "bg-white text-black hover:bg-neutral-200 border-transparent font-bold"
-                  )}
-                >
-                  {isToggling ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : student.is_paid ? (
-                    <>
-                      <CheckCircle2 className="h-3.5 w-3.5 stroke-[2.5]" />
-                      <span>Lunas</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Bayar</span>
-                    </>
-                  )}
-                </button>
+                {/* Right: Actions */}
+                {student.is_paid ? (
+                  <button
+                    onClick={() => handleCancel(student)}
+                    disabled={isCancelLoading}
+                    title="Batalkan pembayaran"
+                    className="h-8 px-3 rounded-xl text-xs font-semibold press-scale transition-all shrink-0 flex items-center gap-1.5 border border-rose-500/30 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 hover:border-rose-500/40 select-none shadow-xs"
+                  >
+                    {isCancelLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                        <span>Batal</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Cash Button */}
+                    <button
+                      onClick={() => handlePayment(student, "cash")}
+                      disabled={isAnyLoading}
+                      title="Bayar Tunai (Cash)"
+                      className="h-8 px-2.5 sm:px-3 rounded-xl text-xs font-semibold press-scale transition-all flex items-center gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/20 hover:border-white/30 select-none shadow-xs"
+                    >
+                      {isCashLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <span>Cash</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* QRIS Button */}
+                    <button
+                      onClick={() => handlePayment(student, "qris")}
+                      disabled={isAnyLoading}
+                      title="Bayar via QRIS"
+                      className="h-8 px-2.5 sm:px-3 rounded-xl text-xs font-semibold press-scale transition-all flex items-center gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/20 hover:border-white/30 select-none shadow-xs"
+                    >
+                      {isQrisLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <span>QRIS</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })

@@ -38,6 +38,8 @@ export interface KasPaymentToggle {
   is_paid: boolean;
   paid_at: string | null;
   amount_paid: number;
+  payment_method: "cash" | "qris";
+  notes?: string | null;
 }
 
 // === Week Students (checklist item) ===
@@ -50,6 +52,7 @@ export interface WeekStudent {
   status: "paid" | "unpaid";
   amount_paid: number;
   paid_at: string | null;
+  payment_method?: "cash" | "qris" | null;
   notes: string | null;
 }
 

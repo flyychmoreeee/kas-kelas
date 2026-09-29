@@ -10,6 +10,7 @@ import type {
 } from "@/types/types";
 
 const BASE_URL = "https://nara.trivox.id/api";
+// const BASE_URL = "http://localhost:8000/api";
 
 async function request<T>(
   endpoint: string,
@@ -98,6 +99,8 @@ export async function getWeekStudents(
 export async function togglePayment(data: {
   student_id: number;
   kas_week_id: number;
+  payment_method?: "cash" | "qris";
+  status?: "paid" | "unpaid";
   notes?: string;
 }) {
   return request<ApiResponse<KasPaymentToggle>>("/kas/toggle-payment", {
