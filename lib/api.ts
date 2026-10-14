@@ -12,6 +12,18 @@ import type {
 const BASE_URL = "https://nara.trivox.id/api";
 // const BASE_URL = "http://localhost:8000/api";
 
+const STORAGE_BASE = "https://nara.trivox.id/storage";
+// const STORAGE_BASE = "http://localhost:8000/storage";
+
+/**
+ * Build a full public URL for a Laravel storage path.
+ * If the path is already a full URL, returns it as-is.
+ */
+export function getStorageUrl(path: string): string {
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${STORAGE_BASE}/${path}`;
+}
+
 async function request<T>(
   endpoint: string,
   options?: RequestInit
@@ -136,13 +148,35 @@ export async function createExpense(data: {
   title: string;
   amount: number;
   expense_date: string;
-  receipt_image?: string;
+  receipt_image?: File;
   notes?: string;
 }) {
-  return request<ApiResponse<KasExpense>>("/kas/expenses", {
+  const formData = new FormData();
+  formData.append("title", data.title);
+  formData.append("amount", String(data.amount));
+  formData.append("expense_date", data.expense_date);
+  if (data.receipt_image) {
+    formData.append("receipt_image", data.receipt_image);
+  }
+  if (data.notes) {
+    formData.append("notes", data.notes);
+  }
+
+  const url = `${BASE_URL}/kas/expenses`;
+  const res = await fetch(url, {
     method: "POST",
-    body: JSON.stringify(data),
+    headers: { Accept: "application/json" },
+    body: formData,
   });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(
+      error.message || `Request failed with status ${res.status}`
+    );
+  }
+
+  return res.json() as Promise<ApiResponse<KasExpense>>;
 }
 
 export async function updateExpense(
@@ -151,14 +185,34 @@ export async function updateExpense(
     title: string;
     amount: number;
     expense_date: string;
-    receipt_image: string;
+    receipt_image: File;
     notes: string;
   }>
 ) {
-  return request<ApiResponse<KasExpense>>(`/kas/expenses/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
+  const formData = new FormData();
+  // Laravel method spoofing: POST + _method=PUT for multipart/form-data
+  formData.append("_method", "PUT");
+  if (data.title !== undefined) formData.append("title", data.title);
+  if (data.amount !== undefined) formData.append("amount", String(data.amount));
+  if (data.expense_date !== undefined) formData.append("expense_date", data.expense_date);
+  if (data.receipt_image) formData.append("receipt_image", data.receipt_image);
+  if (data.notes !== undefined) formData.append("notes", data.notes);
+
+  const url = `${BASE_URL}/kas/expenses/${id}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body: formData,
   });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(
+      error.message || `Request failed with status ${res.status}`
+    );
+  }
+
+  return res.json() as Promise<ApiResponse<KasExpense>>;
 }
 
 export async function deleteExpense(id: number) {

@@ -80,7 +80,11 @@ export interface ActiveWeekStats {
   total_students: number;
   paid_count: number;
   unpaid_count: number;
+  cash_count: number;
+  qris_count: number;
   collected: number;
+  collected_cash: number;
+  collected_qris: number;
 }
 
 export interface KasExpense {
@@ -97,6 +101,8 @@ export interface KasExpense {
 export interface OverviewData {
   balance: number;
   total_income: number;
+  total_cash_income: number;
+  total_qris_income: number;
   total_expense: number;
   active_week: ActiveWeekStats | null;
   recent_expenses: KasExpense[];

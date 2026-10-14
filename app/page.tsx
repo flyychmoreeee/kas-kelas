@@ -8,6 +8,8 @@ import {
   TrendingDown,
   ArrowRight,
   Plus,
+  Banknote,
+  QrCode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -91,11 +93,11 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Sub-panels for Inflow & Outflow (Recessed Dark Wells) */}
+        {/* Sub-panels for Inflow & Outflow */}
         <div className="grid grid-cols-2 gap-2.5 pt-1">
           <div className="rounded-xl bg-black/40 border border-white/10 p-3">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
-              TOTAL PEMASUKAN
+            <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
+              Total Pemasukan
             </span>
             <p className="text-base font-bold text-white tabular-nums tracking-tight">
               {formatRupiah(data.total_income)}
@@ -106,8 +108,8 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-xl bg-black/40 border border-white/10 p-3">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
-              TOTAL PENGELUARAN
+            <span className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
+              Total Pengeluaran
             </span>
             <p className="text-base font-bold text-white tabular-nums tracking-tight">
               {formatRupiah(data.total_expense)}
@@ -115,6 +117,36 @@ export default function DashboardPage() {
             <span className="text-[11px] text-danger font-medium mt-0.5 inline-flex items-center gap-1">
               <TrendingDown className="h-3 w-3 stroke-[2.5]" /> Terpakai
             </span>
+          </div>
+        </div>
+
+        {/* Cash vs QRIS income breakdown */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-black/40 border border-white/10 px-3 py-2.5 flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+              <Banknote className="h-3.5 w-3.5 text-sky-400" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                Tunai
+              </span>
+              <p className="text-sm font-bold text-white tabular-nums">
+                {formatRupiah(data.total_cash_income)}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-xl bg-black/40 border border-white/10 px-3 py-2.5 flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
+              <QrCode className="h-3.5 w-3.5 text-violet-400" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                QRIS
+              </span>
+              <p className="text-sm font-bold text-white tabular-nums">
+                {formatRupiah(data.total_qris_income)}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -166,31 +198,67 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 3-Pill Recessed Summary */}
+          {/* 3-Pill Recessed Summary + Cash/QRIS split */}
           <div className="grid grid-cols-3 gap-2 pt-1">
             <div className="rounded-xl bg-black/40 border border-white/10 p-2.5 text-center">
-              <span className="text-[9px] uppercase font-bold text-muted-foreground block">
-                TOTAL SISWA
+              <span className="text-[11px] uppercase font-bold text-muted-foreground block">
+                Siswa
               </span>
               <p className="text-sm font-bold text-white tabular-nums mt-0.5">
                 {aw.total_students}
               </p>
             </div>
             <div className="rounded-xl bg-black/40 border border-white/10 p-2.5 text-center">
-              <span className="text-[9px] uppercase font-bold text-muted-foreground block">
-                LUNAS
+              <span className="text-[11px] uppercase font-bold text-muted-foreground block">
+                Lunas
               </span>
               <p className="text-sm font-bold text-success tabular-nums mt-0.5">
                 {aw.paid_count}
               </p>
             </div>
             <div className="rounded-xl bg-black/40 border border-white/10 p-2.5 text-center">
-              <span className="text-[9px] uppercase font-bold text-muted-foreground block">
-                BELUM BAYAR
+              <span className="text-[11px] uppercase font-bold text-muted-foreground block">
+                Belum
               </span>
               <p className="text-sm font-bold text-warning tabular-nums mt-0.5">
                 {aw.unpaid_count}
               </p>
+            </div>
+          </div>
+
+          {/* Cash vs QRIS split for active week */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-black/40 border border-white/10 px-3 py-2.5 flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                <Banknote className="h-3.5 w-3.5 text-sky-400" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                  Tunai
+                </span>
+                <p className="text-sm font-bold text-white tabular-nums leading-tight">
+                  {formatRupiah(aw.collected_cash)}
+                </p>
+                <span className="text-[11px] text-sky-400 font-medium">
+                  {aw.cash_count} siswa
+                </span>
+              </div>
+            </div>
+            <div className="rounded-xl bg-black/40 border border-white/10 px-3 py-2.5 flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
+                <QrCode className="h-3.5 w-3.5 text-violet-400" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                  QRIS
+                </span>
+                <p className="text-sm font-bold text-white tabular-nums leading-tight">
+                  {formatRupiah(aw.collected_qris)}
+                </p>
+                <span className="text-[11px] text-violet-400 font-medium">
+                  {aw.qris_count} siswa
+                </span>
+              </div>
             </div>
           </div>
 

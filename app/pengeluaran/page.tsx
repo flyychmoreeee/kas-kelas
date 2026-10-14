@@ -9,15 +9,27 @@ import {
   Pencil,
   X,
   Calendar,
+  Image as ImageIcon,
+  ExternalLink,
+  FileText,
+  ZoomIn,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import {
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+  ResponsiveModalDescription,
+} from "@/components/ui/responsive-modal";
+import {
   getExpenses,
   createExpense,
   updateExpense,
   deleteExpense,
+  getStorageUrl,
 } from "@/lib/api";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { ExpenseModal } from "@/components/pengeluaran/expense-modal";
@@ -40,6 +52,7 @@ export default function ExpensesPage() {
   const [editing, setEditing] = useState<KasExpense | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState<KasExpense | null>(null);
 
   const refreshExpenses = useCallback(async () => {
     try {
@@ -92,6 +105,7 @@ export default function ExpensesPage() {
     title: string;
     amount: number;
     expense_date: string;
+    receipt_image?: File;
     notes?: string;
   }) => {
     try {
@@ -238,27 +252,36 @@ export default function ExpensesPage() {
               key={expense.id}
               className="surface-card rounded-2xl bg-card border border-border/50 p-4 transition-all hover:border-border"
             >
-              <div className="flex items-start gap-3">
-                <div className="shrink-0 rounded-xl bg-black/40 border border-white/10 p-2.5 text-danger mt-0.5">
-                  <Receipt className="h-4 w-4 stroke-[2]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white leading-snug">
-                    {expense.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="shrink-0 rounded-xl bg-black/40 border border-white/10 p-2.5 text-danger mt-0.5">
+                    <Receipt className="h-4 w-4 stroke-[2]" />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-bold text-white leading-snug">
+                      {expense.title}
+                    </p>
                     <span className="text-xs text-muted-foreground flex items-center gap-1 tabular-nums">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       {formatDate(expense.expense_date)}
                     </span>
+                    {expense.receipt_image && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingReceipt(expense)}
+                        className="inline-flex items-center gap-1.5 mt-1.5 text-[11px] text-blue-400 hover:text-blue-300 transition-colors font-medium press-scale"
+                      >
+                        <ImageIcon className="h-3 w-3" />
+                        <span>Lihat bukti nota</span>
+                      </button>
+                    )}
+                    {expense.notes && (
+                      <p className="text-xs text-zinc-400 mt-1.5 rounded-lg bg-black/40 border border-white/5 px-2.5 py-1">
+                        {expense.notes}
+                      </p>
+                    )}
                   </div>
-                  {expense.notes && (
-                    <p className="text-xs text-zinc-400 mt-1.5 rounded-lg bg-black/40 border border-white/5 px-2.5 py-1">
-                      {expense.notes}
-                    </p>
-                  )}
                 </div>
-
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <span className="text-sm font-bold text-white tabular-nums">
                     -{formatRupiah(expense.amount)}
@@ -267,16 +290,16 @@ export default function ExpensesPage() {
                     <button
                       onClick={() => openEdit(expense)}
                       className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-colors press-scale"
-                      title="Edit pengeluaran"
+                      title="Edit"
                     >
-                      <Pencil className="h-3.5 w-3.5 stroke-[1.8]" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(expense.id)}
                       className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-danger hover:bg-danger/10 transition-colors press-scale"
-                      title="Hapus pengeluaran"
+                      title="Hapus"
                     >
-                      <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
@@ -343,6 +366,129 @@ export default function ExpensesPage() {
           if (deleteConfirm) handleDelete(deleteConfirm);
         }}
       />
+
+      {/* Receipt Detail Lightbox Modal Popup */}
+      <ResponsiveModal
+        open={viewingReceipt !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewingReceipt(null);
+        }}
+      >
+        <ResponsiveModalContent className="sm:max-w-md p-0 overflow-hidden bg-[#121214] border border-white/10 shadow-2xl rounded-3xl">
+          {/* Header */}
+          <div className="px-5 pt-5 pb-4">
+            <ResponsiveModalHeader className="pb-0 pr-6">
+              {/* Badge row: type label + amount */}
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap">
+                  <Receipt className="h-3 w-3" />
+                  Bukti Nota Pembelian
+                </span>
+                <span className="text-xs font-bold text-rose-400 font-variant-numeric tabular-nums bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full whitespace-nowrap">
+                  -{viewingReceipt ? formatRupiah(viewingReceipt.amount) : ""}
+                </span>
+              </div>
+              {/* Title */}
+              <ResponsiveModalTitle className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
+                {viewingReceipt?.title}
+              </ResponsiveModalTitle>
+              {/* Date */}
+              <ResponsiveModalDescription className="text-xs text-zinc-400 flex items-center gap-1.5 mt-1.5">
+                <Calendar className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                <span className="tabular-nums font-medium">
+                  {viewingReceipt?.expense_date ? formatDate(viewingReceipt.expense_date) : ""}
+                </span>
+              </ResponsiveModalDescription>
+            </ResponsiveModalHeader>
+          </div>
+
+          {/* Receipt Image — dark lightbox canvas */}
+          <div className="relative bg-black/90 border-y border-white/[0.07] flex items-center justify-center p-4 sm:p-6 min-h-[240px] max-h-[55vh] overflow-hidden group">
+            {viewingReceipt?.receipt_image ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getStorageUrl(viewingReceipt.receipt_image)}
+                  alt={`Bukti nota ${viewingReceipt.title}`}
+                  className="max-h-[48vh] w-auto max-w-full object-contain rounded-xl shadow-2xl"
+                  style={{ outline: "1px solid oklch(1 0 0 / 0.1)" }}
+                />
+                {/* Open full overlay button — appears on hover */}
+                <a
+                  href={getStorageUrl(viewingReceipt.receipt_image)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute inset-0 flex items-end justify-end p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  aria-label="Buka gambar nota penuh"
+                >
+                  <span className="h-8 px-3 rounded-lg bg-black/70 hover:bg-black/90 text-white border border-white/20 backdrop-blur-md text-[11px] font-medium flex items-center gap-1.5 transition-colors duration-150 press-scale shadow-lg">
+                    <ZoomIn className="h-3.5 w-3.5" />
+                    <span>Buka penuh</span>
+                  </span>
+                </a>
+              </>
+            ) : (
+              /* Empty state — no receipt image uploaded */
+              <div className="flex flex-col items-center justify-center gap-3 py-4 select-none">
+                <div className="h-14 w-14 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center">
+                  <ImageIcon className="h-6 w-6 text-zinc-600" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-zinc-400">Tidak ada nota</p>
+                  <p className="text-xs text-zinc-600 mt-0.5">Bukti gambar belum diunggah</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Details & Actions Footer */}
+          <div className="px-4 sm:px-5 pt-4 pb-4 sm:pb-5 space-y-3 bg-[#121214]">
+            {/* Quick Stat Tiles */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-2xl bg-white/[0.04] border border-white/[0.07] px-3.5 py-3">
+                <span className="text-[11px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
+                  Nominal
+                </span>
+                <span className="font-bold text-white tabular-nums text-sm">
+                  {viewingReceipt ? formatRupiah(viewingReceipt.amount) : "—"}
+                </span>
+              </div>
+              <div className="rounded-2xl bg-white/[0.04] border border-white/[0.07] px-3.5 py-3">
+                <span className="text-[11px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
+                  Tanggal
+                </span>
+                <span className="font-medium text-zinc-300 tabular-nums text-sm">
+                  {viewingReceipt?.expense_date ? formatDate(viewingReceipt.expense_date) : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            {viewingReceipt?.notes && (
+              <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl px-3.5 py-3 flex items-start gap-2.5">
+                <FileText className="h-4 w-4 text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
+                    Catatan
+                  </span>
+                  <p className="text-xs leading-[1.6] text-zinc-300" style={{ textWrap: "pretty" } as React.CSSProperties}>
+                    {viewingReceipt.notes}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Close action */}
+            <button
+              type="button"
+              onClick={() => setViewingReceipt(null)}
+              className="h-10 w-full rounded-2xl bg-white/[0.08] hover:bg-white/[0.13] active:bg-white/[0.06] text-white text-sm font-semibold transition-colors duration-150 press-scale flex items-center justify-center border border-white/10"
+            >
+              Tutup
+            </button>
+          </div>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
     </div>
   );
 }
