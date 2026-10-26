@@ -9,10 +9,10 @@ import type {
   WeekStudentsResponse,
 } from "@/types/types";
 
-const BASE_URL = "https://nara.trivox.id/api";
+const BASE_URL = "/backend-api";
 // const BASE_URL = "http://localhost:8000/api";
 
-const STORAGE_BASE = "https://nara.trivox.id/storage";
+const STORAGE_BASE = "/backend-storage";
 // const STORAGE_BASE = "http://localhost:8000/storage";
 
 /**
@@ -24,18 +24,16 @@ export function getStorageUrl(path: string): string {
   return `${STORAGE_BASE}/${path}`;
 }
 
-async function request<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
+async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
+  const hasBody = options?.body !== undefined;
   const res = await fetch(url, {
+    ...options,
     headers: {
-      "Content-Type": "application/json",
       Accept: "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       ...options?.headers,
     },
-    ...options,
   });
 
   if (!res.ok) {

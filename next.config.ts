@@ -4,8 +4,12 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/api/:path*",
-        destination: "http://localhost:8000/api/:path*",
+        source: "/backend-api/:path*",
+        destination: "https://nara.trivox.id/api/:path*",
+      },
+      {
+        source: "/backend-storage/:path*",
+        destination: "https://nara.trivox.id/storage/:path*",
       },
     ];
   },
