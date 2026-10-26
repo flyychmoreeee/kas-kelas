@@ -24,26 +24,139 @@ export function getStorageUrl(path: string): string {
   return `${STORAGE_BASE}/${path}`;
 }
 
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const url = `${BASE_URL}${endpoint}`;
-  const hasBody = options?.body !== undefined;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...options?.headers,
-    },
-  });
+export interface RequestOptions extends RequestInit {
+  retries?: number;
+  timeout?: number;
+}
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
+const DEFAULT_RETRIES = 3;
+const DEFAULT_TIMEOUT_MS = 15000;
+
+/**
+ * Check if HTTP status code indicates a temporary or server issue that can be retried.
+ */
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function request<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+  const url = `${BASE_URL}${endpoint}`;
+  const maxAttempts = options?.retries ?? DEFAULT_RETRIES;
+  const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT_MS;
+  const hasBody = options?.body !== undefined;
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    let isTimeout = false;
+    let timer: NodeJS.Timeout | undefined;
+
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        isTimeout = true;
+        controller.abort();
+      }, timeoutMs);
+    }
+
+    // Link external abort signal if provided
+    const externalSignal = options?.signal;
+    const handleExternalAbort = () => {
+      controller.abort();
+    };
+
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        controller.abort();
+      } else {
+        externalSignal.addEventListener("abort", handleExternalAbort, { once: true });
+      }
+    }
+
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          ...(hasBody && !isFormData ? { "Content-Type": "application/json" } : {}),
+          ...options?.headers,
+        },
+      });
+
+      if (!res.ok) {
+        // If temporary server error / rate limit and still has attempts left, retry
+        if (isRetryableStatus(res.status) && attempt < maxAttempts) {
+          console.warn(
+            `[API] Request ke ${endpoint} gagal (Status ${res.status}). Mencoba lagi (${attempt}/${maxAttempts})...`
+          );
+          const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+          await sleep(backoffDelay);
+          continue;
+        }
+
+        // If client error (4xx) or final attempt, throw the error directly without retry
+        const error = await res.json().catch(() => ({}));
+        throw new Error(
+          error.message || `Request failed with status ${res.status}`
+        );
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      // If manually cancelled from outside, do not retry
+      if (externalSignal?.aborted && !isTimeout) {
+        throw err;
+      }
+
+      if (isTimeout) {
+        lastError = new Error(
+          `Request timeout (${timeoutMs / 1000}s) saat menghubungi ${endpoint}`
+        );
+      } else {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+
+      // Check if this error is a non-retryable response (e.g. 4xx status error thrown above)
+      const isNetworkOrTimeout =
+        isTimeout ||
+        err?.name === "TypeError" ||
+        err?.name === "AbortError";
+
+      if (!isNetworkOrTimeout) {
+        // If it's a known non-retryable error, immediately throw
+        throw lastError;
+      }
+
+      // If attempts remaining, wait with backoff and retry
+      if (attempt < maxAttempts) {
+        console.warn(
+          `[API] Request ke ${endpoint} mengalami kendala: ${lastError.message}. Mencoba lagi (${attempt}/${maxAttempts})...`
+        );
+        const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+        await sleep(backoffDelay);
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (externalSignal) {
+        externalSignal.removeEventListener("abort", handleExternalAbort);
+      }
+    }
+  }
+
+  if (lastError?.name === "TypeError" || lastError?.message?.includes("fetch")) {
     throw new Error(
-      error.message || `Request failed with status ${res.status}`
+      `Gagal terhubung ke server setelah ${maxAttempts} kali percobaan. Pastikan koneksi dan backend aktif.`
     );
   }
 
-  return res.json();
+  throw (
+    lastError ||
+    new Error(`Gagal menyelesaikan request setelah ${maxAttempts} kali percobaan.`)
+  );
 }
 
 // ──────────────────────────────────────
@@ -160,21 +273,10 @@ export async function createExpense(data: {
     formData.append("notes", data.notes);
   }
 
-  const url = `${BASE_URL}/kas/expenses`;
-  const res = await fetch(url, {
+  return request<ApiResponse<KasExpense>>("/kas/expenses", {
     method: "POST",
-    headers: { Accept: "application/json" },
     body: formData,
   });
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(
-      error.message || `Request failed with status ${res.status}`
-    );
-  }
-
-  return res.json() as Promise<ApiResponse<KasExpense>>;
 }
 
 export async function updateExpense(
@@ -196,21 +298,10 @@ export async function updateExpense(
   if (data.receipt_image) formData.append("receipt_image", data.receipt_image);
   if (data.notes !== undefined) formData.append("notes", data.notes);
 
-  const url = `${BASE_URL}/kas/expenses/${id}`;
-  const res = await fetch(url, {
+  return request<ApiResponse<KasExpense>>(`/kas/expenses/${id}`, {
     method: "POST",
-    headers: { Accept: "application/json" },
     body: formData,
   });
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(
-      error.message || `Request failed with status ${res.status}`
-    );
-  }
-
-  return res.json() as Promise<ApiResponse<KasExpense>>;
 }
 
 export async function deleteExpense(id: number) {
